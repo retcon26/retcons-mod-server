@@ -1,7 +1,8 @@
-// PSP Sandbox dedicated server: runs a map with the game's own engine (physics, NPCs, doors, saved
-// builds) and hosts it for PSPs over Wi-Fi and the internet. Nobody plays on the server itself.
+// Retcon's Mod dedicated server (formerly PSP Sandbox's): runs a map with the game's own engine (physics,
+// NPCs, doors, saved builds) and hosts it for PSPs over Wi-Fi and the internet. Nobody plays on the
+// server itself. With "mode list" it's a server list instead (src/listserver.c).
 //
-//   psp-sandbox-server [-c server.cfg] [--game DIR] [--map NAME] [--port N] [--name NAME]
+//   psp-sandbox-server [-c server.cfg] [--game DIR] [--map NAME] [--port N] [--name NAME] [--mode list]
 //
 // Type commands while it runs: help, status, say, kick, map, save, load, cleanup, quit.
 
@@ -24,19 +25,23 @@
 #include "settings.h"
 #include "version.h"
 
-#define SERVER_VERSION "1.0.0"
+#define SERVER_VERSION "1.1.0"
+#define HEARTBEAT_US 30000000 // how often a game server tells its server list it's still up
 
 ServerConfig g_server = {
+    .mode = "game",
     .game_dir = ".",
     .map = "gm_construct",
-    .name = "Sandbox Server",
+    .name = "Retcon's Server",
     .port = NET_PORT,
+    .list_port = NET_LIST_PORT,
     .lan = 1,
     .tick = 60,
 };
 
 static volatile sig_atomic_t g_quit;
 static int g_in_game;
+static int g_list_mode;
 
 static void on_signal(int sig) {
     (void)sig;
@@ -71,7 +76,15 @@ static void trim(char *s) {
 
 // One "key value" setting (from server.cfg or the command line); 0 if the key isn't one
 static int apply_setting(const char *key, const char *value) {
-    if (strcmp(key, "game_dir") == 0 || strcmp(key, "game") == 0) {
+    if (strcmp(key, "mode") == 0) {
+        snprintf(g_server.mode, sizeof(g_server.mode), "%s", value);
+    } else if (strcmp(key, "list") == 0) {
+        snprintf(g_server.list, sizeof(g_server.list), "%s", value);
+    } else if (strcmp(key, "public_address") == 0) {
+        snprintf(g_server.public_address, sizeof(g_server.public_address), "%s", value);
+    } else if (strcmp(key, "list_port") == 0) {
+        g_server.list_port = atoi(value);
+    } else if (strcmp(key, "game_dir") == 0 || strcmp(key, "game") == 0) {
         snprintf(g_server.game_dir, sizeof(g_server.game_dir), "%s", value);
     } else if (strcmp(key, "map") == 0) {
         snprintf(g_server.map, sizeof(g_server.map), "%s", value);
@@ -127,9 +140,47 @@ static int load_config(const char *path, int required) {
 }
 
 static void usage(void) {
-    printf("PSP Sandbox dedicated server %s (game %s)\n\n", SERVER_VERSION, GAME_VERSION);
-    printf("  psp-sandbox-server [-c server.cfg] [--game DIR] [--map NAME] [--port N] [--name NAME]\n\n");
-    printf("DIR is a PSP Sandbox folder (the one with data/ in it). Settings in server.cfg, see server.cfg.example.\n");
+    printf("Retcon's Mod dedicated server %s (game %s)\n\n", SERVER_VERSION, GAME_VERSION);
+    printf("  psp-sandbox-server [-c server.cfg] [--game DIR] [--map NAME] [--port N] [--name NAME]\n");
+    printf("  psp-sandbox-server --mode list [--list_port N]     (a server list)\n\n");
+    printf("DIR is the game's folder (the one with data/ in it). Settings in server.cfg, see server.cfg.example.\n");
+}
+
+// --- The server list: a game server's heartbeats ------------------------------------------------------
+
+static uint8_t g_list_addr[6];
+static int g_list_ok; // 1 resolved, -1 couldn't be (tried again at the next heartbeat)
+static SceInt64 g_next_heartbeat;
+
+static void heartbeat(void) {
+    if (!g_server.list[0] || !net_active()) return;
+    SceInt64 now = sceKernelGetSystemTimeWide();
+    if (now < g_next_heartbeat) return;
+    g_next_heartbeat = now + HEARTBEAT_US;
+    if (g_list_ok != 1) {
+        char text[80];
+        snprintf(text, sizeof(text), strchr(g_server.list, ':') ? "%s" : "%s:18257", g_server.list);
+        int was = g_list_ok;
+        g_list_ok = net_resolve(text, g_list_addr) == 0 ? 1 : -1;
+        if (g_list_ok != 1) {
+            if (was == 0) logf_("Can't find the server list %s (trying again every 30 seconds)", g_server.list);
+            return;
+        }
+        logf_("Listing this server on %s", g_server.list);
+    }
+    PkHeartbeat hb;
+    memset(&hb, 0, sizeof(hb));
+    hb.h = (NetHeader){NET_MAGIC, PK_HEARTBEAT, 0, NET_VERSION};
+    // The address players should use: public_address if it's set, else the one the list sees us at
+    if (g_server.public_address[0]) {
+        uint8_t a[6];
+        char text[48];
+        snprintf(text, sizeof(text), "%s:%d", g_server.public_address, g_server.port);
+        if (net_resolve(text, a) == 0) memcpy(hb.addr, a, 4);
+    }
+    hb.addr[4] = (uint8_t)(g_server.port >> 8);
+    hb.addr[5] = (uint8_t)(g_server.port & 0xFF);
+    net_send(g_list_addr, &hb, sizeof(hb));
 }
 
 // --- Maps ---------------------------------------------------------------------------------------------
@@ -142,6 +193,7 @@ static int start_map(const char *map) {
     }
     g_in_game = 1;
     game_host_dedicated(game_log);
+    g_next_heartbeat = 0; // tell the server list straight away
     logf_("Hosting %s as \"%s\" on UDP port %d", map, g_server.name, g_server.port);
     if (!net_active()) logf_("Network: %s", net_status());
     return 0;
@@ -174,6 +226,17 @@ static void console_line(char *line) {
     if (*arg) *arg++ = 0;
     while (*arg == ' ') arg++;
     if (!*line) return;
+    if (g_list_mode) {
+        if (strcmp(line, "status") == 0) {
+            logf_("Server list on UDP port %d", g_server.list_port);
+            logf_("%d servers listed", list_server_status(game_log));
+        } else if (strcmp(line, "quit") == 0 || strcmp(line, "exit") == 0) {
+            g_quit = 1;
+        } else {
+            logf_("status | quit");
+        }
+        return;
+    }
     if (strcmp(line, "help") == 0) {
         logf_("status | say TEXT | kick SLOT | map NAME | save NAME | load NAME | cleanup | quit");
     } else if (strcmp(line, "status") == 0) {
@@ -219,11 +282,12 @@ static void console_line(char *line) {
 static void console_poll(void) {
     static char buf[256];
     static size_t used;
+    static int closed; // stdin closed (running in the background): no console
     struct pollfd p = {0, POLLIN, 0};
-    while (poll(&p, 1, 0) > 0 && (p.revents & POLLIN)) {
+    while (!closed && poll(&p, 1, 0) > 0 && (p.revents & (POLLIN | POLLHUP))) {
         ssize_t n = read(0, buf + used, sizeof(buf) - 1 - used);
         if (n <= 0) {
-            p.fd = -1; // stdin closed (running in the background): no console
+            closed = 1;
             return;
         }
         used += (size_t)n;
@@ -265,6 +329,33 @@ int main(int argc, char **argv) {
         }
     }
     if (g_server.tick < 10 || g_server.tick > 240) g_server.tick = 60;
+    signal(SIGINT, on_signal);
+    signal(SIGTERM, on_signal);
+    signal(SIGPIPE, SIG_IGN);
+    setvbuf(stdout, NULL, _IOLBF, 0);
+
+    if (strcmp(g_server.mode, "list") == 0) {
+        // A server list: no game, no game data
+        g_list_mode = 1;
+        logf_("Retcon's Mod server list %s (game protocol %d)", SERVER_VERSION, NET_VERSION);
+        if (list_server_start() != 0) {
+            logf_("Can't open UDP port %d", g_server.list_port);
+            return 1;
+        }
+        logf_("Listening on UDP port %d. Type status or quit", g_server.list_port);
+        while (!g_quit) {
+            console_poll();
+            list_server_poll(game_log);
+            usleep(10000);
+        }
+        list_server_stop();
+        logf_("Shutting down");
+        return 0;
+    }
+    if (strcmp(g_server.mode, "game") != 0) {
+        fprintf(stderr, "mode is game or list, not %s\n", g_server.mode);
+        return 1;
+    }
 
     // The engine reads data/... from the game folder, as it does on the PSP
     if (chdir(g_server.game_dir) != 0) {
@@ -273,18 +364,13 @@ int main(int argc, char **argv) {
     }
     struct stat st;
     if (stat("data/maps", &st) != 0) {
-        fprintf(stderr, "%s has no data/maps: point game_dir at a PSP Sandbox folder (the one with data/ in it)\n",
+        fprintf(stderr, "%s has no data/maps: point game_dir at the game's folder (the one with data/ in it)\n",
                 g_server.game_dir);
         return 1;
     }
     snprintf(g_settings.name, sizeof(g_settings.name), "%s", g_server.name);
 
-    signal(SIGINT, on_signal);
-    signal(SIGTERM, on_signal);
-    signal(SIGPIPE, SIG_IGN);
-    setvbuf(stdout, NULL, _IOLBF, 0);
-
-    logf_("PSP Sandbox dedicated server %s (game %s)", SERVER_VERSION, GAME_VERSION);
+    logf_("Retcon's Mod dedicated server %s (game %s)", SERVER_VERSION, GAME_VERSION);
     mem_init();
     game_preload();
     if (start_map(g_server.map) != 0) return 1;
@@ -302,6 +388,7 @@ int main(int argc, char **argv) {
     while (!g_quit) {
         console_poll();
         if (g_in_game) game_update(&in, 1.0f / (float)g_server.tick);
+        heartbeat();
         next += step;
         SceInt64 now = sceKernelGetSystemTimeWide();
         if (next > now) {

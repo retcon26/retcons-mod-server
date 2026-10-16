@@ -12,7 +12,7 @@ BIN = psp-sandbox-server
 # are the platform's (src/platform.c, src/net.c)
 ENGINE_SRC = game physics collision map ents npc player proplib propx pak vehicle vmodel camera sky ui settings \
              menu achieve workshop builds
-SRC = main platform net
+SRC = main platform net listserver
 
 CC ?= gcc
 CFLAGS ?= -O2 -g

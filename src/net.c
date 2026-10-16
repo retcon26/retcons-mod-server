@@ -202,6 +202,12 @@ void net_lobby_query(const uint8_t *addr) {
 void net_lobby_join(const NetHost *h) {
     (void)h;
 }
+void net_lobby_list_request(const uint8_t *list_addr) {
+    (void)list_addr;
+}
+int net_lobby_listed(void) {
+    return -1;
+}
 void net_lobby_result(char *map, int map_len, int *slot, uint8_t host_mac[6]) {
     (void)map;
     (void)map_len;

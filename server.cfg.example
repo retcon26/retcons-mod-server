@@ -1,7 +1,7 @@
-# PSP Sandbox dedicated server settings. Copy this to server.cfg next to psp-sandbox-server (or pass
+# Retcon's Mod dedicated server settings. Copy this to server.cfg next to psp-sandbox-server (or pass
 # -c FILE). Anything here can also be given on the command line, e.g. --map gm_flatgrass --port 18300.
 
-# A PSP Sandbox folder: the one with data/ in it (your release's PSP/GAME/PSPSandbox, or psp/ in a
+# The game's folder: the one with data/ in it (your release's PSP/GAME/PSPSandbox, or psp/ in a
 # psp-sandbox checkout with converted data). Give the server its own copy if you can: it reads the maps
 # and packs, and writes saved builds to data/saves.
 game_dir ./PSPSandbox
@@ -11,7 +11,7 @@ map gm_construct
 #build My Build
 
 # Shown in the PSPs' Online Servers list (15 characters at most)
-name Sandbox Server
+name Retcon's Server
 
 # UDP port. Players add the server as address:port when it isn't 18256 (the game's own port, which
 # Online Servers' LAN search uses).
@@ -19,6 +19,12 @@ port 18256
 
 # 1: send beacons round the local network too, so PSPs on the same Wi-Fi find the server by themselves
 lan 1
+
+# A server list to appear on, so players see this server without typing its address (its port is 18257
+# unless you add :port). public_address: the address the list should give players, only when it can't see
+# the right one itself (a list on your own network listing this server for players outside it).
+#list lists.example.org
+#public_address 203.0.113.5
 
 # World updates a second
 tick 60
