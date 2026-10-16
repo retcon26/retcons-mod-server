@@ -39,7 +39,9 @@ converted the data. **No game content is in this repository.** The data comes fr
 installs (see the game's README), and the PSPs that join need the same map.
 
 Give the server its own copy of the folder if you can. It reads maps and packs, writes saved builds to
-`data/saves/`, and never touches the PSP's settings or achievements.
+`data/saves/`, and never touches the PSP's settings or achievements. The server's NPCs find their way round walls
+with a map's node graph, `data/maps/<map>.pnav`, made by the converter with the map (`tools/bspconv.sh nav` makes
+them for maps converted before 1.8.2); without it they head straight for where they're going.
 
 ## Running
 
