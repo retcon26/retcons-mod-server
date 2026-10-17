@@ -5,6 +5,7 @@ typedef struct {
     char mode[8];       // "game": host a map; "list": a server list for game servers and PSPs
     char game_dir[256]; // the game's folder: the one with data/ in it
     char map[32];
+    char gamemode[16];  // a gamemode to run ("prophunt", "zombiesurvival"...; "" or "sandbox": none)
     char name[16];      // shown in the PSPs' Online Servers list
     char build[24];     // a saved build (data/saves/<build>.build) to load where it was built, or ""
     char list[64];      // a server list to be listed on (host or host:port), or ""

@@ -1,8 +1,8 @@
 # Retcon's Mod dedicated server: the game's own engine (game/psp/src, the retcons-mod repo as a submodule)
 # on a small PC platform layer (src/) with stand-ins for the PSP SDK's headers (compat/).
 #
-#   make                 build ./retcons-mod-server
-#   make LUA=1           with Lua addons (needs Lua 5.4's headers: liblua5.4-dev)
+#   make                 build ./retcons-mod-server (with Lua when pkg-config finds Lua 5.4: liblua5.4-dev)
+#   make LUA=0           without Lua: no addons or gamemodes
 #   make ENGINE=path     the engine from somewhere else (a retcons-mod checkout's psp/src)
 
 ENGINE ?= game/psp/src
@@ -21,6 +21,8 @@ CFLAGS += -std=gnu11 -ffast-math -Wall -Wno-unused-parameter -Wno-unused-functio
 CPPFLAGS += -iquote $(ENGINE) -Icompat -Isrc -I$(ENGINE) -D_GNU_SOURCE -DPSP_SANDBOX_SERVER
 LDLIBS += -lm
 
+# Lua (addons and gamemodes) when the system has Lua 5.4's headers
+LUA ?= $(shell pkg-config --exists lua5.4 && echo 1 || echo 0)
 ifeq ($(LUA),1)
 ENGINE_SRC += script
 CPPFLAGS += $(shell pkg-config --cflags lua5.4)

@@ -1,11 +1,12 @@
 // Retcon's Mod dedicated server: runs a map with the game's own engine (physics, NPCs, doors, saved
 // builds) and hosts it for up to 7 PSPs over Wi-Fi and the internet, with a password if it's set, a map
-// rotation and the build saved every few minutes. Nobody plays on the server itself. With "mode list" it's
-// a server list instead (src/listserver.c).
+// rotation, a gamemode (Prop Hunt, Zombie Survival... in Lua) and the build saved every few minutes. Nobody
+// plays on the server itself. With "mode list" it's a server list instead (src/listserver.c).
 //
-//   retcons-mod-server [-c server.cfg] [--game DIR] [--map NAME] [--port N] [--name NAME] [--mode list]
+//   retcons-mod-server [-c server.cfg] [--game DIR] [--map NAME] [--gamemode NAME] [--port N] [--name NAME]
+//                      [--mode list]
 //
-// Type commands while it runs: help, status, say, kick, map, next, save, load, cleanup, quit.
+// Type commands while it runs: help, status, say, kick, map, next, gamemode, save, load, cleanup, quit.
 
 #include <errno.h>
 #include <poll.h>
@@ -26,7 +27,7 @@
 #include "settings.h"
 #include "version.h"
 
-#define SERVER_VERSION "1.2.1"
+#define SERVER_VERSION "1.3.0"
 #define HEARTBEAT_US 30000000 // how often a game server tells its server list it's still up
 
 ServerConfig g_server = {
@@ -91,6 +92,8 @@ static int apply_setting(const char *key, const char *value) {
         g_server.list_port = atoi(value);
     } else if (strcmp(key, "game_dir") == 0 || strcmp(key, "game") == 0) {
         snprintf(g_server.game_dir, sizeof(g_server.game_dir), "%s", value);
+    } else if (strcmp(key, "gamemode") == 0) {
+        snprintf(g_server.gamemode, sizeof(g_server.gamemode), "%s", strcmp(value, "sandbox") == 0 ? "" : value);
     } else if (strcmp(key, "map") == 0) {
         snprintf(g_server.map, sizeof(g_server.map), "%s", value);
     } else if (strcmp(key, "name") == 0) {
@@ -158,7 +161,7 @@ static int load_config(const char *path, int required) {
 
 static void usage(void) {
     printf("Retcon's Mod dedicated server %s (game %s)\n\n", SERVER_VERSION, GAME_VERSION);
-    printf("  retcons-mod-server [-c server.cfg] [--game DIR] [--map NAME] [--port N] [--name NAME]\n");
+    printf("  retcons-mod-server [-c server.cfg] [--game DIR] [--map NAME] [--gamemode NAME] [--port N] [--name NAME]\n");
     printf("  retcons-mod-server --mode list [--list_port N]     (a server list)\n\n");
     printf("DIR is the game's folder (the one with data/ in it). Settings in server.cfg, see server.cfg.example.\n");
 }
@@ -213,7 +216,7 @@ static void autosave_name(const char *map, char *out, int len) {
 
 // Saves the players' build, if there is one and autosaving is on (the game logs it)
 static void autosave(void) {
-    if (!g_in_game || g_server.autosave_minutes <= 0) return;
+    if (!g_in_game || g_server.autosave_minutes <= 0 || game_gamemode()[0]) return; // a gamemode's game: no builds
     char name[32], cmd[48];
     autosave_name(g_server.map, name, sizeof(name));
     snprintf(cmd, sizeof(cmd), "autosave %s", name);
@@ -223,6 +226,7 @@ static void autosave(void) {
 // resume: load the map's last autosave, if it has one and autosave_resume is on
 static int start_map(const char *map, int resume) {
     char err[96] = "";
+    game_set_gamemode(g_server.gamemode);
     if (game_start(map, err, sizeof(err)) != 0) {
         logf_("Can't start %s: %s", map, err);
         return -1;
@@ -230,8 +234,10 @@ static int start_map(const char *map, int resume) {
     g_in_game = 1;
     game_host_dedicated(game_log);
     g_next_heartbeat = 0; // tell the server list straight away
-    logf_("Hosting %s as \"%s\" on UDP port %d, for %d players%s", map, g_server.name, g_server.port,
-          g_server.max_players, g_server.password[0] ? " with a password" : "");
+    logf_("Hosting %s%s%s as \"%s\" on UDP port %d, for %d players%s", map, g_server.gamemode[0] ? " - " : "",
+          g_server.gamemode, g_server.name, g_server.port, g_server.max_players,
+          g_server.password[0] ? " with a password" : "");
+    if (g_server.gamemode[0]) resume = 0; // a gamemode's game starts as the map is
     if (!net_active()) logf_("Network: %s", net_status());
     g_map_start = sceKernelGetSystemTimeWide();
     g_next_autosave = g_map_start + (SceInt64)g_server.autosave_minutes * 60000000;
@@ -311,7 +317,8 @@ static void maps_tick(void) {
 // --- Console ------------------------------------------------------------------------------------------
 
 static void cmd_status(void) {
-    logf_("%s - %s - port %d", g_server.name, g_in_game ? g_server.map : "(no map)", g_server.port);
+    logf_("%s - %s - %s - port %d", g_server.name, g_in_game ? g_server.map : "(no map)",
+          game_gamemode()[0] ? game_gamemode() : "sandbox", g_server.port);
     int n = 0;
     for (int s = 1; s < NET_MAX_PLAYERS; s++) {
         const char *name = game_peer_name(s);
@@ -345,7 +352,7 @@ static void console_line(char *line) {
         return;
     }
     if (strcmp(line, "help") == 0) {
-        logf_("status | say TEXT | kick SLOT | map NAME | next | save NAME | load NAME | cleanup | quit");
+        logf_("status | say TEXT | kick SLOT | map NAME | next | gamemode NAME | save NAME | load NAME | cleanup | quit");
     } else if (strcmp(line, "status") == 0) {
         cmd_status();
     } else if (strcmp(line, "say") == 0 && *arg) {
@@ -361,6 +368,14 @@ static void console_line(char *line) {
         }
     } else if (strcmp(line, "map") == 0 && *arg) {
         change_map(arg);
+    } else if (strcmp(line, "gamemode") == 0) {
+        // A gamemode (or "sandbox") from now on: the map starts again with it
+        if (!*arg) {
+            logf_("Gamemode: %s", game_gamemode()[0] ? game_gamemode() : "sandbox");
+        } else {
+            snprintf(g_server.gamemode, sizeof(g_server.gamemode), "%s", strcmp(arg, "sandbox") == 0 ? "" : arg);
+            change_map(g_server.map);
+        }
     } else if (strcmp(line, "next") == 0) {
         char next[32];
         if (next_map(next, sizeof(next))) {

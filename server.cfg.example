@@ -10,6 +10,11 @@ game_dir ./RetconsMod
 map gm_construct
 #build My Build
 
+# A gamemode: prophunt, zombiesurvival, deathmatch, or one of your own in data/lua/gamemodes (its file name
+# without .lua). Leave it out (or "sandbox") for the sandbox. Needs the server built with Lua (see README).
+# Saved builds and autosaves are the sandbox's: a gamemode's game doesn't load or save them.
+#gamemode prophunt
+
 # Shown in the PSPs' Online Servers list (15 characters at most)
 name Retcon's Server
 

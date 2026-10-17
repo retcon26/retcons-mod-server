@@ -5,13 +5,14 @@ sandbox for the PSP. It runs the game's own engine on a Linux PC or a rented ser
 physics, NPCs, ragdolls, doors and saved builds all run on the server, and PSPs join it over Wi-Fi or the internet.
 
 - Up to **7 players** (`max_players`), with a **password** if you like.
+- **Gamemodes**: Prop Hunt, Zombie Survival, Deathmatch, or your own in Lua (`gamemode`).
 - A **map rotation**: every player's PSP follows the server to the next map by itself.
 - The players' build **saved every few minutes**, and loaded again when its map comes back round.
 - PSPs find it in **Multiplayer > Online Servers**: by itself on the same network, through a **server list**, or
   by its address.
 - A **console** for status, chat, kicking, changing maps and loading saved builds.
 - The same program is also a **server list** (`--mode list`): game servers sign up to it, and PSPs see them all.
-- Server 1.2.1 needs the game **1.11.0** on the PSPs (the server and the PSPs must speak the same network
+- Server 1.3.0 needs the game **1.12.0** on the PSPs (the server and the PSPs must speak the same network
   protocol; see the game's [changelog](https://github.com/retcon26/retcons-mod/blob/main/docs/CHANGELOG.md)).
 
 It was called psp-sandbox-server before 1.2.0; GitHub forwards the old links.
@@ -30,8 +31,8 @@ That needs `gcc` and `make` (`sudo apt install build-essential`). Already cloned
 `git submodule update --init`. To build against another copy of the game's source, use
 `make ENGINE=path/to/retcons-mod/psp/src` (a path with no spaces).
 
-**Lua addons** don't run on the server unless you build it with them: `sudo apt install liblua5.4-dev`, then
-`make LUA=1`.
+**Lua** (addons and gamemodes) needs Lua 5.4's headers: `sudo apt install liblua5.4-dev`. `make` uses them
+whenever they're there (`make LUA=0` leaves Lua out). Without Lua, a `gamemode` falls back to the sandbox.
 
 ## Game data
 
@@ -59,6 +60,7 @@ setting in [server.cfg.example](server.cfg.example) works as `--setting value`.
 |---|---|---|
 | `game_dir` | `.` | The game's folder (with `data/`) |
 | `map` | `gm_construct` | The map to host |
+| `gamemode` | | `prophunt`, `zombiesurvival`, `deathmatch`, or one of your own in `data/lua/gamemodes` (its file name); none (the sandbox) if it's not set. A gamemode's game doesn't load or autosave builds |
 | `build` | | A saved build (`data/saves/NAME.build`) to load where it was built |
 | `name` | `Retcon's Server` | Shown in Online Servers (15 characters at most) |
 | `port` | `18256` | UDP port |
@@ -87,6 +89,7 @@ Type these while it runs:
 | `kick SLOT` | Sends a player away (slots are in `status`) |
 | `map NAME` | Changes map (after an autosave): every player's PSP joins the new map by itself |
 | `next` | The next map in the rotation, now |
+| `gamemode NAME` | Plays NAME (or `sandbox`) from now on: the map starts again with it. On its own, says which is running |
 | `save NAME` / `load NAME` | Saves everything spawned to `data/saves/NAME.build` / loads a build where it was built |
 | `cleanup` | Removes everything spawned |
 | `quit` | Stops the server (Ctrl+C works too) |
