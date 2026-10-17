@@ -202,6 +202,9 @@ void net_lobby_query(const uint8_t *addr) {
 void net_lobby_join(const NetHost *h) {
     (void)h;
 }
+void net_lobby_set_password(const char *password) {
+    (void)password;
+}
 void net_lobby_list_request(const uint8_t *list_addr) {
     (void)list_addr;
 }

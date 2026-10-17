@@ -1,32 +1,34 @@
 # Retcon's Mod Server
 
-A dedicated server for [Retcon's Mod](https://github.com/retcon26/psp-sandbox) (formerly PSP Sandbox), the physics
+A dedicated server for [Retcon's Mod](https://github.com/retcon26/retcons-mod) (formerly PSP Sandbox), the physics
 sandbox for the PSP. It runs the game's own engine on a Linux PC or a rented server, with nobody playing on it: the
 physics, NPCs, ragdolls, doors and saved builds all run on the server, and PSPs join it over Wi-Fi or the internet.
 
-- Up to **3 players** (the game's 4 slots, minus the host's, which the server keeps empty).
+- Up to **7 players** (`max_players`), with a **password** if you like.
+- A **map rotation**: every player's PSP follows the server to the next map by itself.
+- The players' build **saved every few minutes**, and loaded again when its map comes back round.
 - PSPs find it in **Multiplayer > Online Servers**: by itself on the same network, through a **server list**, or
   by its address.
 - A **console** for status, chat, kicking, changing maps and loading saved builds.
 - The same program is also a **server list** (`--mode list`): game servers sign up to it, and PSPs see them all.
-- Needs the game **1.7.0** or newer on the PSPs (the server and the PSPs must be the same version), and **1.7.1**
-  for server lists.
+- Server 1.2.0 needs the game **1.10.0** on the PSPs (the server and the PSPs must speak the same network
+  protocol; see the game's [changelog](https://github.com/retcon26/retcons-mod/blob/main/docs/CHANGELOG.md)).
 
-The repository keeps its old name (psp-sandbox-server) for now, while the game moves over to its new name.
+It was called psp-sandbox-server before 1.2.0; GitHub forwards the old links.
 
 ## Building
 
 The engine comes from the game's repo, as a git submodule in `game/`. On Linux, or WSL on Windows:
 
 ```bash
-git clone --recursive https://github.com/retcon26/psp-sandbox-server.git
-cd psp-sandbox-server
+git clone --recursive https://github.com/retcon26/retcons-mod-server.git
+cd retcons-mod-server
 make
 ```
 
 That needs `gcc` and `make` (`sudo apt install build-essential`). Already cloned without `--recursive`? Run
 `git submodule update --init`. To build against another copy of the game's source, use
-`make ENGINE=path/to/psp-sandbox/psp/src` (a path with no spaces).
+`make ENGINE=path/to/retcons-mod/psp/src` (a path with no spaces).
 
 **Lua addons** don't run on the server unless you build it with them: `sudo apt install liblua5.4-dev`, then
 `make LUA=1`.
@@ -34,12 +36,12 @@ That needs `gcc` and `make` (`sudo apt install build-essential`). Already cloned
 ## Game data
 
 The server loads the same converted maps and packs as the PSP: point `game_dir` at the game's folder, the one
-with `data/` in it. That's your install's `PSP/GAME/PSPSandbox`, or `psp/` in a psp-sandbox checkout where you've
+with `data/` in it. That's your install's `PSP/GAME/RetconsMod`, or `psp/` in a retcons-mod checkout where you've
 converted the data. **No game content is in this repository.** The data comes from your own Valve and GMod
 installs (see the game's README), and the PSPs that join need the same map.
 
 Give the server its own copy of the folder if you can. It reads maps and packs, writes saved builds to
-`data/saves/`, and never touches the PSP's settings or achievements. The server's NPCs find their way round walls
+`data/saves/` (autosaves are `auto-<map>.build`), and never touches the PSP's settings or achievements. The server's NPCs find their way round walls
 with a map's node graph, `data/maps/<map>.pnav`, made by the converter with the map (`tools/bspconv.sh nav` makes
 them for maps converted before 1.8.2); without it they head straight for where they're going.
 
@@ -47,10 +49,10 @@ them for maps converted before 1.8.2); without it they head straight for where t
 
 ```bash
 cp server.cfg.example server.cfg   # then set game_dir, map, name...
-./psp-sandbox-server
+./retcons-mod-server
 ```
 
-Or with no config file: `./psp-sandbox-server --game ~/PSPSandbox --map gm_flatgrass --name "My Server"`. Every
+Or with no config file: `./retcons-mod-server --game ~/RetconsMod --map gm_flatgrass --name "My Server"`. Every
 setting in [server.cfg.example](server.cfg.example) works as `--setting value`.
 
 | Setting | Default | What it does |
@@ -62,6 +64,12 @@ setting in [server.cfg.example](server.cfg.example) works as `--setting value`.
 | `port` | `18256` | UDP port |
 | `lan` | `1` | Beacons on the local network too, so PSPs there find the server without its address |
 | `tick` | `60` | World updates a second |
+| `max_players` | `7` | How many can play at once (1 to 7) |
+| `password` | | Players type it in to join (Online Servers marks the server "locked"); none if it's not set |
+| `maps` | | A map rotation: map names with spaces between, e.g. `gm_construct gm_flatgrass gm_bigcity` |
+| `map_minutes` | `30` | Minutes on each map of the rotation, with a minute's warning (0: no rotation) |
+| `autosave_minutes` | `5` | The players' build is saved this often, and on a map change or shutdown (0: never) |
+| `autosave_resume` | `1` | A map starts with its last autosave (`data/saves/auto-<map>.build`) |
 | `list` | | A server list to appear on (`host` or `host:port`; its port is 18257 unless you say) |
 | `public_address` | | The address the list gives players, when it's not the one the list sees (a LAN-only list) |
 | `mode` | `game` | `game` hosts a map; `list` runs a server list instead (see below) |
@@ -74,22 +82,24 @@ Type these while it runs:
 
 | Command | |
 |---|---|
-| `status` | The map and who's in each slot |
+| `status` | The map, who's in each slot, and the next map |
 | `say TEXT` | A chat line on everyone's screen |
 | `kick SLOT` | Sends a player away (slots are in `status`) |
-| `map NAME` | Changes map: players are told to join again |
+| `map NAME` | Changes map (after an autosave): every player's PSP joins the new map by itself |
+| `next` | The next map in the rotation, now |
 | `save NAME` / `load NAME` | Saves everything spawned to `data/saves/NAME.build` / loads a build where it was built |
 | `cleanup` | Removes everything spawned |
 | `quit` | Stops the server (Ctrl+C works too) |
 
-Joins, leaves and chat go to the log. `PSB_DEBUG=1 ./psp-sandbox-server` also logs every packet that arrives.
+Joins, leaves, chat and autosaves go to the log. `PSB_DEBUG=1 ./retcons-mod-server` also logs every packet
+that arrives.
 
 ## Server lists
 
 A server list saves players typing addresses: every dedicated server that signs up shows in their Online Servers.
 
 ```bash
-./psp-sandbox-server --mode list            # on a machine everyone can reach (UDP port 18257)
+./retcons-mod-server --mode list            # on a machine everyone can reach (UDP port 18257)
 ```
 
 It needs no game data and runs nothing but the list (`status` lists its servers). Each game server signs up with
@@ -111,7 +121,7 @@ them about its game itself, so a stopped server never shows. For players outside
 2. **Multiplayer > Online Servers.** A server on the same network shows up by itself. Otherwise press
    **Triangle** and type its address, a name or `1.2.3.4`, with `:port` if it isn't 18256. Or press **R** and
    type a server list's address to see every server on it. Both are kept in `data/servers.cfg`.
-3. Pick it and press **X**.
+3. Pick it and press **X**. A "locked" server asks for its password.
 
 For players outside your network, forward **UDP port 18256** on your router to the PC that runs the server, and
 give them your public address.

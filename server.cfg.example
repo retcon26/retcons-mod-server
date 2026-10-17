@@ -1,10 +1,10 @@
-# Retcon's Mod dedicated server settings. Copy this to server.cfg next to psp-sandbox-server (or pass
+# Retcon's Mod dedicated server settings. Copy this to server.cfg next to retcons-mod-server (or pass
 # -c FILE). Anything here can also be given on the command line, e.g. --map gm_flatgrass --port 18300.
 
-# The game's folder: the one with data/ in it (your release's PSP/GAME/PSPSandbox, or psp/ in a
-# psp-sandbox checkout with converted data). Give the server its own copy if you can: it reads the maps
+# The game's folder: the one with data/ in it (your release's PSP/GAME/RetconsMod, or psp/ in a
+# retcons-mod checkout with converted data). Give the server its own copy if you can: it reads the maps
 # and packs, and writes saved builds to data/saves.
-game_dir ./PSPSandbox
+game_dir ./RetconsMod
 
 # The map to host, and a saved build to load where it was built (data/saves/NAME.build), if any
 map gm_construct
@@ -28,6 +28,19 @@ lan 1
 
 # World updates a second
 tick 60
+
+# How many can play at once (1 to 7), and a password to join (no # in it: that starts a comment)
+max_players 7
+#password secret
+
+# A map rotation: map names with spaces between, and the minutes on each (map is the first one hosted)
+#maps gm_construct gm_flatgrass gm_bigcity
+map_minutes 30
+
+# The players' build saved this often (minutes, 0: never) as data/saves/auto-<map>.build, and loaded again
+# when that map starts
+autosave_minutes 5
+autosave_resume 1
 
 # The game's options, as the host's are in a PSP-hosted game
 god_mode 0

@@ -1,12 +1,12 @@
-# PSP Sandbox dedicated server: the game's own engine (game/psp/src, the psp-sandbox repo as a submodule)
+# Retcon's Mod dedicated server: the game's own engine (game/psp/src, the retcons-mod repo as a submodule)
 # on a small PC platform layer (src/) with stand-ins for the PSP SDK's headers (compat/).
 #
-#   make                 build ./psp-sandbox-server
+#   make                 build ./retcons-mod-server
 #   make LUA=1           with Lua addons (needs Lua 5.4's headers: liblua5.4-dev)
-#   make ENGINE=path     the engine from somewhere else (a psp-sandbox checkout's psp/src)
+#   make ENGINE=path     the engine from somewhere else (a retcons-mod checkout's psp/src)
 
 ENGINE ?= game/psp/src
-BIN = psp-sandbox-server
+BIN = retcons-mod-server
 
 # The engine files the server runs; gfx, audio, input, voice, the keyboard, memory and the network
 # are the platform's (src/platform.c, src/net.c)
@@ -45,7 +45,7 @@ build/src/%.o: src/%.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 $(ENGINE)/game.c:
-	@echo "No engine at $(ENGINE): run git submodule update --init (or make ENGINE=path/to/psp-sandbox/psp/src)"
+	@echo "No engine at $(ENGINE): run git submodule update --init (or make ENGINE=path/to/retcons-mod/psp/src)"
 	@false
 
 clean:

@@ -13,6 +13,12 @@ typedef struct {
     int list_port;      // mode list: its UDP port
     int lan;            // 1: beacons round the LAN too, so PSPs on it find the server by themselves
     int tick;           // world updates a second
+    int max_players;    // 1 to 7: the game's 8 slots, less the one the server keeps
+    char password[16];  // players need it to join ("": anyone can)
+    char maps[512];     // the map rotation: map names with spaces between ("": just map)
+    int map_minutes;    // minutes on each map before the next in maps (0: no rotation)
+    int autosave_minutes; // the players' build saved this often (0: never)
+    int autosave_resume;  // 1: a map starts with its last autosave
 } ServerConfig;
 
 extern ServerConfig g_server;
