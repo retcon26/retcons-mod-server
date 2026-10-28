@@ -12,8 +12,9 @@ physics, NPCs, ragdolls, doors and saved builds all run on the server, and PSPs 
   by its address.
 - A **console** for status, chat, kicking, changing maps and loading saved builds.
 - The same program is also a **server list** (`--mode list`): game servers sign up to it, and PSPs see them all.
-- Server 1.3.0 needs the game **1.12.0** on the PSPs (the server and the PSPs must speak the same network
-  protocol; see the game's [changelog](https://github.com/retcon26/retcons-mod/blob/main/docs/CHANGELOG.md)).
+- Server 1.4.0 runs the game 1.15.0's engine, and PSPs on the game **1.12.0 to 1.15.0** can join (the server
+  and the PSPs must speak the same network protocol, 15; see the game's
+  [changelog](https://github.com/retcon26/retcons-mod/blob/main/docs/CHANGELOG.md)).
 
 It was called psp-sandbox-server before 1.2.0; GitHub forwards the old links.
 

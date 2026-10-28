@@ -191,8 +191,10 @@ void gfx_end_frame(void) {}
 void gfx_present(int vsync) {}
 void gu_flashlight(int on, const float eye[3], const float fwd[3]) {}
 void gfx_world_light(int k, int on, int spot, const float pos[3], const float dir[3], unsigned int abgr, float range) {}
-void gfx_flash_world_begin(void) {}
-void gfx_flash_world_end(void) {}
+int gfx_light_pass_wanted(void) { return 0; }
+int gfx_light_reaches(const float mins[3], const float maxs[3]) { return 0; }
+void gfx_light_pass_begin(void) {}
+void gfx_light_pass_end(void) {}
 void gfx_flash_lit_begin(void) {}
 void gfx_flash_lit_end(void) {}
 void gfx_set_fog(float near_dist, float far_dist, unsigned int abgr) {}

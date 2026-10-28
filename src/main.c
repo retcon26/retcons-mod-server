@@ -27,7 +27,7 @@
 #include "settings.h"
 #include "version.h"
 
-#define SERVER_VERSION "1.3.0"
+#define SERVER_VERSION "1.4.0"
 #define HEARTBEAT_US 30000000 // how often a game server tells its server list it's still up
 
 ServerConfig g_server = {
